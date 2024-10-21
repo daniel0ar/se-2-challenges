@@ -1,116 +1,289 @@
-# 🏗 Scaffold-ETH 2 Challenges
+# 🚩 Challenge 5: 📺 A State Channel Application
 
-**Learn how to use 🏗 Scaffold-ETH 2 to create decentralized applications on Ethereum. 🚀**
+![readme-5](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/a6ea79fe-3fa1-4a3b-96d0-e5c0d2286356)
 
----
+🐌 The Ethereum blockchain has great decentralization & security properties. These properties come at a price: transaction throughput is low, and transactions can be expensive (search term: blockchain trilemma). This makes many traditional web applications infeasible on a blockchain... or does it?
 
-## 🚩 Challenge 0: 🎟 Simple NFT Example
+🍰 A number of approaches to scaling have been developed, collectively referred to as layer-2s (L2s). Among them is the concept of payment channels, state channels, and state channel networks. This tutorial walks through the creation of a simple state channel application, where users seeking a service **lock** collateral on-chain with a single transaction, **interact** with their service provider entirely off-chain, and **finalize** the interaction with a second on-chain transaction.
 
-🎫 Create a simple NFT to learn the basics of 🏗 scaffold-eth. You'll use 👷‍♀️ HardHat to compile and deploy smart contracts. Then, you'll use a template React app full of important Ethereum components and hooks. Finally, you'll deploy an NFT to a public network to share with friends! 🚀
+🧑‍🤝‍🧑 State channels really excel as a scaling solution in cases where a fixed set of participants want to exchange value-for-service at high frequency. The canonical example is in file sharing or media streaming: the server exchanges chunks of a file in exchange for micropayments.
 
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-0-simple-nft
+🧙 In our case, the service provider is a `Guru` who provides off-the-cuff wisdom to each client `Rube` through a one-way chat box. Each character of text that is delivered is expected to be compensated with a payment of `0.01 ETH`.
 
----
+📖 Read more about state channels in the [Ethereum Docs.](https://ethereum.org/en/developers/docs/scaling/state-channels/)
 
-## 🚩 Challenge 1: 🔏 Decentralized Staking App
+❗ [OpenZepplin's ECDSA Library](https://docs.openzeppelin.com/contracts/2.x/api/cryptography#ECDSA) provides an easy way to verify signed messages, but for this challenge we'll write the code ourselves.
 
-🦸 A superpower of Ethereum is allowing you, the builder, to create a simple set of rules that an adversarial group of players can use to work together. In this challenge, you create a decentralized application where users can coordinate a group funding effort. If the users cooperate, the money is collected in a second smart contract. If they defect, the worst that can happen is everyone gets their money back. The users only have to trust the code.
+## 🏅 Main Quests
 
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-1-decentralized-staking
+- 🛣️ Build a `packages/hardhat/contracts/Streamer.sol` contract that collects **ETH** from numerous client addresses using a payable `fundChannel()` function and keeps track of `balances`.
+- 💵 Exchange paid services off-chain between the `packages/hardhat/contracts/Streamer.sol` contract owner (the **Guru**) and **rube** clients with funded channels. The **Guru** provides the service in exchange for signed vouchers which can later be redeemed on-chain.
+- ⏱ Create a Challenge mechanism with a timeout, so that **rubes** are protected from a **Guru** who goes offline while funds are locked on-chain (either by accident, or as a theft attempt).
+- ⁉ Consider some security / usability holes in the current design.
 
----
-
-## 🚩 Challenge 2: 🏵 Token Vendor
-
-🤖 Smart contracts are kind of like "always on" vending machines that anyone can access. Let's make a decentralized, digital currency. Then, let's build an unstoppable vending machine that will buy and sell the currency. We'll learn about the "approve" pattern for ERC20s and how contract to contract interactions work.
-
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-2-token-vendor
+> 💬 Meet other builders working on this challenge and get help in the [State Channel Telegram](https://t.me/+k0eUYngV2H0zYWUx)!
 
 ---
 
-## 🚩 Challenge 3: 🎲 Dice Game
+## Checkpoint 0: 📦 Environment 📚
 
-🎰 Randomness is tricky on a public deterministic blockchain. In this challenge you will explore creating random numbers using block hash and how that may be exploitable. Attack the dice game with your own contract by predicting the randomness ahead of time to always roll a winner!
+Before you begin, you need to install the following tools:
 
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-3-dice-game
+- [Node (v18 LTS)](https://nodejs.org/en/download/)
+- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
+- [Git](https://git-scm.com/downloads)
+
+Then download the challenge to your computer and install dependencies by running:
+
+```sh
+git clone https://github.com/scaffold-eth/se-2-challenges.git challenge-5-state-channels
+cd challenge-5-state-channels
+git checkout challenge-5-state-channels
+yarn install
+```
+
+> in the same terminal, start your local network (a blockchain emulator in your computer):
+
+```sh
+yarn chain
+```
+
+> in a second terminal window, 🛰 deploy your contract (locally):
+
+```sh
+cd challenge-5-state-channels
+yarn deploy
+```
+
+> in a third terminal window, start your 📱 frontend:
+
+```sh
+cd challenge-5-state-channels
+yarn start
+```
+
+📱 Open http://localhost:3000 to see the app.
+
+> 👩‍💻 Rerun `yarn deploy` whenever you want to deploy new contracts to the frontend. If you haven't made any contract changes, you can run `yarn deploy --reset` for a completely fresh deploy.
 
 ---
 
-## 🚩 Challenge 4: ⚖️ Build a DEX Challenge
+## Checkpoint 1: 🧘‍♀️ Configure Guru & Rube 📃
 
-💵 Build an exchange that swaps ETH to tokens and tokens to ETH. 💰 This is possible because the smart contract holds reserves of both assets and has a price function based on the ratio of the reserves. Liquidity providers are issued a token that represents their share of the reserves and fees...
+Like the [token vendor challenge](https://speedrunethereum.com/challenge/token-vendor), we'll be building an `Ownable` contract. The contract owner is the **Guru** (the service provider in this application), and you will use multiple browser windows or tabs to assume the roles of Guru and rube (service provider & client).
 
-DEX Telegram Channel: https://t.me/+_NeUIJ664Tc1MzIx
+> 👁 `contract Streamer` inherits `Ownable` with the `is` keyword. `Ownable` comes from [openzeppelin-contracts](https://github.com/OpenZeppelin/openzeppelin-contracts) - a collection of high quality smart contract library code.
 
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-4-dex
+> 📝 In `packages/hardhat/deploy/00_deploy_streamer.js`, uncomment the lines of code that deploy the contract and transfer ownership. You will need to enter your own frontend address, to act as Guru.
 
----
+You'll have to redeploy with `yarn deploy --reset`.
 
-## 🎉 Checkpoint: Eligible to join 🏰️ BuidlGuidl
+We'll need another active address to act as the rube in our app. To do this just open a new tab in your browser.
 
-The BuidlGuidl is a curated group of Ethereum builders creating products, prototypes, and tutorials to enrich the web3 ecosystem. A place to show off your builds and meet other builders. Start crafting your Web3 portfolio by submitting your DEX, Multisig or SVG NFT build.
+> ⚠️ **Note**: previous challenges created new addresses by opening an incognito window or a different browser. This will **not** work for this challenge, because the off-chain application uses a very simple communication pipe that doesn't work between different browsers or private windows.
 
-https://buidlguidl.com/
+![wallets-setup](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/1c0ede93-fd7d-4683-a3f0-803b52ca947c)
 
----
+### 🥅 Goals:
 
-## 🚩 Challenge 5: 📺 State Channel Application Challenge
-
-🛣️ The Ethereum blockchain has great decentralization & security properties but these properties come at a price: transaction throughput is low, and transactions can be expensive. This makes many traditional web applications infeasible on a blockchain... or does it? State channels look to solve these problems by allowing participants to securely transact off-chain while keeping interaction with Ethereum Mainnet at a minimum.
-
-State Channels Telegram Channel: https://t.me/+k0eUYngV2H0zYWUx
-
-https://github.com/scaffold-eth/se-2-challenges/tree/challenge-5-state-channels
+- [ ] Does your original frontend address receive the `Hello Guru` UI?
+- [ ] Does your alternate addresses receive the `Hello Rube` UI?
 
 ---
 
-## 💡 Contributing: Guide and Hints to create New Challenges
+## Checkpoint 2: 💸 Fund a Channel 📺
 
-- We'd use the [base-challenge-template](https://github.com/scaffold-eth/se-2-challenges/tree/base-challenge-template) as a starting point for each challenge.
-- UI wise, we'll try to use the https://speedrunethereum.com/ design vibe.
+Like the [decentralized staking challenge](https://speedrunethereum.com/challenge/decentralized-staking), we'll track balances for individual channels / users in a mapping:
 
-Check out already migrated Challenges to get a better idea of the structure and how to create new ones.
+```
+mapping (address => uint256) balances;
+```
 
-A quick start guide.
+Rubes seeking wisdom will use a **payable** `fundChannel()` function, which will update this mapping with the supplied balance.
 
-### 1. Branch from [base-challenge-template](https://github.com/scaffold-eth/se-2-challenges/tree/base-challenge-template)
+> 📝 Edit `packages/hardhat/contracts/Streamer.sol` to complete the `fundChannel()` function
 
-At `base-challenge-template` branch we will be adding the latest updates from Scaffold ETH 2. We'll also include the learnings we acquire during the Challenges we are adding, as well as the code that may be common to all the Challenges.
+> 👁 Check `packages/nextjs/app/streamer/_components/Rube.tsx` to see the frontend calling this function. (ctrl-f fundChannel)
 
-### 2. Edit `pages/index.tsx`
+> Run `yarn deploy` and open a channel in the Rube's tab. (You may need some funds from the faucet)
 
-The main page should have a banner image (ask for it!) + the Challenge description.
+![channel-open](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/69a30c45-d384-476f-8b7d-67bc23d21833)
 
-> {challengeHeroImage}
->
-> A {challengeDescription}.
->
-> 🌟 The final deliverable is an app that {challengeDeliverable}.
-> Deploy your contracts to a testnet then build and upload your app to a public web server. Submit the url on [SpeedRunEthereum.com](https://speedrunethereum.com)!
+### 🥅 Goals:
 
-### 3. Implement the Challenge
+- [ ] Does opening a channel cause a `Received Wisdom` box to appear?
+- [ ] Do opened channels appear on the Guru's UI as well?
+- [ ] Using the _Debug Contracts_ tab, does a repeated call to `fundChannel` fail?
 
-- Add the contract(s)
-- Add pages / components as you need (UI following the [SpeedRunEthereum.com](https://speedrunethereum.com/) design vibe)
-- Create the test for the Smart Contract(s). The best starting point is to copy the tests from the SE1 Challenge you are migrating. The "envvar" logic there is used by the autograder, so don't remove them.
+---
 
-### 4. Adapt Header / MetaHeader component
+## Checkpoint 3: 💱 Exchange the Service 👷‍♂️
 
-Update the site title on `Header.tsx` and title and description of your challenge in `MetaHeader.tsx`.
+Now that the channel is funded and all participants have observed the funding via the emitted event, we can begin our off-chain exchange of service. We are now working in `packages/nextjs/app/streamer/page.tsx` and its components.
 
-### 5. Image assets for your Challenge
+Functions of note:
 
-You will need to add the following image assets in `packages/nextjs/public` folder (ask the designers for it):
+- `provideService` in `packages/nextjs/app/streamer/_components/Guru.tsx`: The Guru sends wisdom over the wire to the client.
+- `reimburseService` in `packages/nextjs/app/streamer/_components/Rube.tsx`: The rube creates a voucher for the received service, signs it, and returns it.
+- `processVoucher` in `packages/nextjs/app/streamer/_components/Guru.tsx`: The service provider receives and stores vouchers.
 
-- **Thumbnail.** `thumbnail.png`
-  Will be shown in your link previews when shared to others in chat or in social media.
-- **Hero image.** `hero.png`
-  It's a wider version of the Thumbnail with SRE logo at the bottom right. Used as README header, and as `pages/index.tsx` hero image.
+The first two functions are complete - we will work on `processVoucher`, where the service provider examines returned payments, confirms their authenticity, and stores them.
 
-### 6. Edit README adapting the [base template](https://github.com/scaffold-eth/se-2-challenges/tree/base-challenge-template#readme)
+> 📝 Edit `packages/nextjs/app/streamer/_components/Guru.tsx` to complete the `processVoucher()` function and secure this off-chain exchange. You'll need to recreate the encoded message that the client has signed, and then verify that the received signature was in fact produced by the client on that same data.
 
-Adapt the base template README using the SE-1 version as a reference.
+### 🥅 Goals:
 
-### 7. Create a PR against the challenge branch
+- [ ] Secure your service! Validate the incoming voucher & signature according to instructions inside `processVoucher()`
+- [ ] With an open channel, start sending advice. Can you see the claimable balance update as service is rendered? This should happen only if rube has "Autopay" active.
 
-We can iterate and test there.
+![guru-advice](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/d1cc665a-6c44-4fff-b0ac-c4d8ff490a15)
+![rube-received-advice](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/70da22a2-0c3a-4e14-b6fa-f103c6eb2c9c)
+
+### ⚔️ Side Quest:
+
+- [ ] Can `provideService` be modified to prevent continued service to clients who don't keep up with their payments?
+
+> 💬 Hint: You'll want to compare the size of your best voucher against the size of your provided wisdom. If there's too big a discrepency, cut them off!
+
+## Checkpoint 4: 💰 Recover Service Provider's Earnings 💵
+
+Now that we've collected some vouchers, we'd like to redeem them on-chain and move funds from the `Streamer` contract's `balances` map to the Guru's own address. The `withdrawEarnings` function of `packages/hardhat/contracts/Streamer.sol` takes a Struct named voucher (balance + signature) as input, and should:
+
+- Recover the signer using `ecrecover(bytes32, uint8, bytes32, bytes32)` on the `prefixedHashed` message and supplied signature.
+  - _Hint_: `ecrecover` takes the signature in its decomposed form with `v,`,`r`, and`s` values. The string signature produced in `packages/nextjs/app/streamer/_components/Rube.tsx` is just a concatenation of these values, which we split using `ethers.Signature.from` in `packages/nextjs/app/streamer/_components/CashOutVoucherButton.tsx` to create the on-chain friendly signature. Read about the [ecrecover function here](https://docs.soliditylang.org/en/v0.8.17/units-and-global-variables.html)
+- Check that the signer has a running channel with balance greater than the voucher's `updatedBalance`
+- Calculate the payout (`balances[signer] - updatedBalance`)
+- Update the channel balance.
+- Send the payout to the Guru.
+
+💡 Reminders:
+
+- Changes to contracts must be redeployed to the local chain with `yarn deploy --reset`.
+- For troubleshooting / debugging, your contract can use hardhat's `console.log`, which will print to your console running the chain.
+
+> 📝 Edit `packages/hardhat/contracts/Streamer.sol` to complete the `withdrawEarnings()` function as described.
+
+> 📝 Edit `packages/nextjs/app/streamer/_components/Guru.tsx` to enable the UI button for withdrawals.
+
+### 🥅 Goals:
+
+- [ ] Recover funds on-chain for services rendered! After the Guru submits a voucher to chain, you should be able to see the wallet's ETH balance increase.
+
+![eth-locked-updated](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/0d09a5d8-914b-4acd-b7ec-fb862df83144)
+![guru-balance-updated](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/02f9dc8a-5357-49e0-9112-e84df04f1ebd)
+
+### ⚔️ Side Quest:
+
+- [ ] `withdrawEarnings` is a function that only the service provider would be interested in calling. Should it be marked `onlyOwner`? (the `onlyOwner` modifier makes a function accessible only to the contract owner - anyone else who tries to call it will be immediately rejected).
+
+## Checkpoint 5: 💪 Challenge & Close the Channel 🔽
+
+So far so good:
+
+- Rubes can connect to the Guru via an on-chain deposit.
+- The pair can then transact off-chain with high throughput.
+- The Guru can recover earnings with their received vouchers.
+
+But what if a rube is unimpressed with the service and wishes to close a channel to recover whatever funds remain? What if the Guru is a no-show after the initial channel funding deposit?
+
+A payment channel is a cryptoeconomic protocol - care needs to be taken so that everyone's financial interests are protected. We'll implement a two step **challenge** and **close** mechanism that allows rubes to recover unspent funds, while keeping the Guru's earnings safe.
+
+> 📝 Edit `packages/hardhat/contracts/Streamer.sol` to create a public `challengeChannel()` function.
+
+> 📝 Edit `packages/nextjs/app/streamer/_components/Rube.tsx` to enable the challenge and closure buttons for service clients(rubes).
+
+The `challengeChannel()` function should:
+
+- Check in the `balances` map that a channel is already open in the name of `msg.sender`
+- Declare this channel to be closing by setting `canCloseAt[msg.sender]` to `block.timestamp + 30 seconds`
+- Emit a `Challenged` event with the sender's address.
+
+The emitted event gives notice to the Guru that the channel will soon be emptied, so they should apply whatever vouchers they have before the timeout period ends.
+
+![guru-alert](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/671eed08-ff0c-4165-8147-0d91c339b217)
+
+> 📝 Edit `packages/hardhat/contracts/Streamer.sol` to create a public `defundChannel()` function.
+
+The `defundChannel()` function should:
+
+- Check that `msg.sender` has a channel that can be closed, by ensuring a non-zero `canCloseAt[msg.sender]` is before the current timestamp.
+- Transfer `balances[msg.sender]` to the sender.
+- Emit a `Closed` event.
+
+### 🥅 Goals:
+
+- [ ] Launch a challenge as a channel client. If wisdom has been given, the Guru's UI should show an alert via their `Cash out latest voucher` button.
+- [ ] Recover the Guru's best voucher before the channel closes.
+- [ ] Close the channel and recover rube funds.
+
+![close-channel-button](https://github.com/scaffold-eth/se-2-challenges/assets/55535804/8ecec2c3-9f4a-40d5-ac42-84d8e5500f23)
+
+### ⚔️ Side Quests:
+
+- [ ] Currently, the service provider has to manually submit their vouchers after a challenge is registered on chain. Should their channel wallet do that automatically? Can you implement that in this application?
+- [ ] Suppose some rube enjoyed their first round of advice. Is it safe for them to open a new channel with `packages/hardhat/contracts/Streamer.sol`? (_Hint_: what data does the Guru still hold?)
+
+### ⚠️ Test it!
+
+- Now is a good time to run `yarn test` to run the automated testing function. It will test that you hit the core checkpoints. You are looking for all green checkmarks and passing tests!
+
+---
+
+## Checkpoint 6: 💾 Deploy your contracts! 🛰
+
+📡 Edit the `defaultNetwork` to [your choice of public EVM networks](https://ethereum.org/en/developers/docs/networks/) in `packages/hardhat/hardhat.config.ts`
+
+🔐 You will need to generate a **deployer address** using `yarn generate` This creates a mnemonic and saves it locally.
+
+👩‍🚀 Use `yarn account` to view your deployer account balances.
+
+⛽️ You will need to send ETH to your **deployer address** with your wallet, or get it from a public faucet of your chosen network.
+
+🚀 Run `yarn deploy` to deploy your smart contract to a public network (selected in `hardhat.config.ts`)
+
+> 💬 Hint: You can set the `defaultNetwork` in `hardhat.config.ts` to `sepolia` or `optimismSepolia` **OR** you can `yarn deploy --network sepolia` or `yarn deploy --network optimismSepolia`.
+
+---
+
+## Checkpoint 7: 🚢 Ship your frontend! 🚁
+
+✏️ Edit your frontend config in `packages/nextjs/scaffold.config.ts` to change the `targetNetwork` to `chains.sepolia` (or `chains.optimismSepolia` if you deployed to OP Sepolia)
+
+💻 View your frontend at http://localhost:3000 and verify you see the correct network.
+
+📡 When you are ready to ship the frontend app...
+
+📦 Run `yarn vercel` to package up your frontend and deploy.
+
+> Follow the steps to deploy to Vercel. Once you log in (email, github, etc), the default options should work. It'll give you a public URL.
+
+> If you want to redeploy to the same production URL you can run `yarn vercel --prod`. If you omit the `--prod` flag it will deploy it to a preview/test URL.
+
+> 🦊 Since we have deployed to a public testnet, you will now need to connect using a wallet you own or use a burner wallet. By default 🔥 `burner wallets` are only available on `hardhat` . You can enable them on every chain by setting `onlyLocalBurnerWallet: false` in your frontend config (`scaffold.config.ts` in `packages/nextjs/`)
+
+#### Configuration of Third-Party Services for Production-Grade Apps.
+
+By default, 🏗 Scaffold-ETH 2 provides predefined API keys for popular services such as Alchemy and Etherscan. This allows you to begin developing and testing your applications more easily, avoiding the need to register for these services.  
+This is great to complete your **SpeedRunEthereum**.
+
+For production-grade applications, it's recommended to obtain your own API keys (to prevent rate limiting issues). You can configure these at:
+
+- 🔷`ALCHEMY_API_KEY` variable in `packages/hardhat/.env` and `packages/nextjs/.env.local`. You can create API keys from the [Alchemy dashboard](https://dashboard.alchemy.com/).
+
+- 📃`ETHERSCAN_API_KEY` variable in `packages/hardhat/.env` with your generated API key. You can get your key [here](https://etherscan.io/myapikey).
+
+> 💬 Hint: It's recommended to store env's for nextjs in Vercel/system env config for live apps and use .env.local for local testing.
+
+---
+
+## Checkpoint 8: 📜 Contract Verification
+
+Run the `yarn verify --network your_network` command to verify your contracts on etherscan 🛰
+
+👉 Search this address on [Sepolia Etherscan](https://sepolia.etherscan.io/) (or [Optimism Sepolia Etherscan](https://sepolia-optimism.etherscan.io/) if you deployed to OP Sepolia) to get the URL you submit to 🏃‍♀️[SpeedRunEthereum.com](https://speedrunethereum.com).
+
+---
+
+> 🏃 Head to your next challenge [here](https://speedrunethereum.com).
+
+> 💬 Problems, questions, comments on the stack? Post them to the [🏗 scaffold-eth developers chat](https://t.me/joinchat/F7nCRK3kI93PoCOk)
